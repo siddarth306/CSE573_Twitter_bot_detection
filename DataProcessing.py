@@ -4,8 +4,6 @@ import pickle
 import pandas as pd
 
 
-#
-
 def csv_writer(filtered_data, count):
     filtered_data.to_pickle('DataSet\\weeks\\data-from-week-' + str(count) + '.pkl')
 
@@ -28,10 +26,8 @@ while from_date <= df['dates'].max():
         count = count + 1
     from_date = to_date
 
-# print(count)
-week = 14
-while week <= 36:
-    count = 1
+week = 1
+while week <= count:
     pickled_file = pd.read_pickle('DataSet\\weeks\\data-from-week-' + str(week) + '.pkl')
     d = {}
     for i in pickled_file['screen_name_from'].unique():
@@ -43,6 +39,3 @@ while week <= 36:
     with open('DataSet\\users\\data-from-week-' + str(week) + '.pkl', 'wb') as handle:
         pickle.dump(d, handle)
     week = week + 1
-
-# pickled_file = pd.read_pickle('DataSet\\weeks\\data-from-week-14.pkl')
-# print(pickled_file)

@@ -3,6 +3,7 @@ import pickle
 import os
 import json
 import numpy as np
+import multiprocessing
 
 import pandas as pd
 
@@ -47,37 +48,39 @@ def split_weeks(df):
 
 def extract_user_and_retweet_data(count):
     print('Extracting users and retweet data by week...')
-    for week in range(1, count + 1):
-        # load data from pickle
-        print('Extracting data for week', week)
-        week_data = pd.read_pickle(os.path.join('DataSet', 'weeks', 'data-from-week-' + str(week) + '.pkl'))
-
-        # extract users and retweets
-        tids = set()
-        user_data = {}
-        for user in week_data['screen_name_from'].unique():
-            user_data[user] = set()
-            for i in week_data[week_data['screen_name_from'] == user].index:
-                tid = week_data['retweet_tid'][i]
-                user_data[user].add(tid)
-                tids.add(tid)
-            # filter out users with only 1 retweet
-            if len(user_data[user]) == 1:
-                del user_data[user]
-
-        print("Number of users in week " + str(week) + ": " + str(len(user_data)))
-        print("Number of tweets in week " + str(week) + ": " + str(len(tids)))
-
-        # save result to pickle
-        data_folder = os.path.join('DataSet', 'users')
-        tweets_folder = os.path.join('DataSet', 'tweets')
-        users_filename = 'data-from-week-' + str(week)
-        tweets_filename = 'tweets-from-week-' + str(week)
-        write_pickle(user_data, data_folder, users_filename)
-        write_pickle(tids, tweets_folder, tweets_filename)
-
-        week = week + 1
+    pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2 or 1)
+    pool.map(extraction_worker, range(1, count + 1))
+    pool.join()
     print('Extraction complete')
+
+
+def extraction_worker(week):
+    # load data from pickle
+    week_data = pd.read_pickle(os.path.join('DataSet', 'weeks', 'data-from-week-' + str(week) + '.pkl'))
+
+    # extract users and retweets
+    tids = set()
+    user_data = {}
+    for user in week_data['screen_name_from'].unique():
+        user_data[user] = set()
+        for i in week_data[week_data['screen_name_from'] == user].index:
+            tid = week_data['retweet_tid'][i]
+            user_data[user].add(tid)
+            tids.add(tid)
+        # filter out users with only 1 retweet
+        if len(user_data[user]) == 1:
+            del user_data[user]
+
+    print("Number of users in week " + str(week) + ": " + str(len(user_data)))
+    print("Number of tweets in week " + str(week) + ": " + str(len(tids)))
+
+    # save result to pickle
+    data_folder = os.path.join('DataSet', 'users')
+    tweets_folder = os.path.join('DataSet', 'tweets')
+    users_filename = 'data-from-week-' + str(week)
+    tweets_filename = 'tweets-from-week-' + str(week)
+    write_pickle(user_data, data_folder, users_filename)
+    write_pickle(tids, tweets_folder, tweets_filename)
 
 
 def build_user_vectors(count):

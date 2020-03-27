@@ -134,6 +134,7 @@ class NpEncoder(json.JSONEncoder):
 def run_process_pool(worker_func, args):
     pool = multiprocessing.Pool(abs(multiprocessing.cpu_count() - 2) or 1)
     pool.map(worker_func, args)
+    pool.close()
     pool.join()
 
 

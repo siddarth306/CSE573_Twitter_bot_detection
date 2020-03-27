@@ -1,6 +1,8 @@
 import datetime
 import pickle
 import os
+import json
+import numpy as np
 
 import pandas as pd
 
@@ -43,24 +45,63 @@ def split_weeks(df):
     return count
 
 
-def extract_user_data(count):
+def extract_user_and_retweet_data(count):
     print('Extracting users and retweet data by week...')
-    week = 1
-    while week <= count:
+    for week in range(1, count + 1):
+        # load data from pickle
         print('Extracting data for week', week)
-        pickled_file = pd.read_pickle(os.path.join('DataSet', 'weeks', 'data-from-week-' + str(week) + '.pkl'))
-        d = {}
-        for i in pickled_file['screen_name_from'].unique():
-            d[i] = [{'retweet_tid': pickled_file['retweet_tid'][j],
-                    'postedtime': pickled_file['postedtime'][j]}
-                    for j in pickled_file[pickled_file['screen_name_from'] == i].index]
-            count = count + 1
-        filename = os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl')
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        with open(filename, 'wb') as handle:
-            pickle.dump(d, handle)
+        week_data = pd.read_pickle(os.path.join('DataSet', 'weeks', 'data-from-week-' + str(week) + '.pkl'))
+
+        # extract users and retweets
+        tids = set()
+        user_data = {}
+        for user in week_data['screen_name_from'].unique():
+            user_data[user] = set()
+            for i in week_data[week_data['screen_name_from'] == user].index:
+                tid = week_data['retweet_tid'][i]
+                user_data[user].add(tid)
+                tids.add(tid)
+
+        print("Number of users in week " + str(week) + ": " + str(len(user_data)))
+        print("Number of tweets in week " + str(week) + ": " + str(len(tids)))
+
+        # save result to pickle
+        folder_path = os.path.join('DataSet', 'users')
+        data_filename = 'data-from-week-' + str(week)
+        tweets_filename = 'tweets-from-week-' + str(week)
+        write_json(user_data, folder_path, data_filename)
+        write_json(tids, folder_path, tweets_filename)
+
         week = week + 1
     print('Extraction complete')
+
+
+def write_pickle(data, folder_path, base_filename):
+    os.makedirs(folder_path, exist_ok=True)
+    with open(os.path.join(folder_path, base_filename + '.pkl'), 'wb') as handle:
+        pickle.dump(data, handle)
+
+
+"""Function to write data to json for debugging purposes."""
+def write_json(data, folder_path, base_filename):
+    os.makedirs(folder_path, exist_ok=True)
+    with open(os.path.join(folder_path, base_filename + '.json'), 'w') as handle:
+        json.dump(data, handle, cls=NpEncoder, ensure_ascii=False, indent=4)
+
+
+"""This class is for encoding numpy types to json."""
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, set):
+            return list(obj)
+        else:
+            return super(NpEncoder, self).default(obj)
 
 
 if __name__ == '__main__':

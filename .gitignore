@@ -111,6 +111,7 @@ dmypy.json
 # Data files
 *.csv
 *.pkl
+*.json
 
 # Visual Studio Code
 .vscode/*

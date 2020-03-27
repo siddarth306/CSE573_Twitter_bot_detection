@@ -96,13 +96,25 @@ def vector_worker(week):
         tweet_data = pickle.load(file)
     tids = list(tweet_data)
 
-    # build user vectors
-    user_vectors = {user: [(1 if tid in retweets else 0) for tid in tids] for user, retweets in user_data}
+    # assign a bit position to each tweet in the week
+    tid_bit_vectors = {tid: 1 for tid in tids}
+    i = 1
+    for tid in tid_bit_vectors.keys():
+        tid_bit_vectors[tid] = tid_bit_vectors[tid] << i
+        i += 1
+
+    # build user vectors (the vectors are bit vectors to save space)
+    user_vectors = {user: 1 for user in user_data.keys()}
+    for user, retweets in user_data.items():
+        for tid in retweets:
+            user_vectors[user] |=  tid_bit_vectors[tid]
 
     # save results to pickle
     vector_folder = os.path.join('DataSet', 'vectors')
     vector_filename = 'user-vectors-for-week-' + str(week)
     write_pickle(user_vectors, vector_folder, vector_filename)
+    print("Completed vectors for week", week)
+
 
 def write_pickle(data, folder_path, base_filename):
     os.makedirs(folder_path, exist_ok=True)

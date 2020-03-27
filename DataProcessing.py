@@ -2,9 +2,9 @@ import datetime
 import pickle
 import os
 import json
-import numpy as np
 import multiprocessing
 
+import numpy as np
 import pandas as pd
 
 
@@ -12,6 +12,7 @@ def main():
     df = read_data()
     count = split_weeks(df)
     extract_user_and_retweet_data(count)
+    build_user_vectors(count)
 
 
 def csv_writer(filtered_data, count):
@@ -48,9 +49,7 @@ def split_weeks(df):
 
 def extract_user_and_retweet_data(count):
     print('Extracting users and retweet data by week...')
-    pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2 or 1)
-    pool.map(extraction_worker, range(1, count + 1))
-    pool.join()
+    run_process_pool(extraction_worker, range(1, count + 1))
     print('Extraction complete')
 
 
@@ -85,21 +84,24 @@ def extraction_worker(week):
 
 def build_user_vectors(count):
     print("Building user retweet vectors by week...")
-    for week in range(1, count + 1):
-        # load data from pickles
-        print("Building user vectors for week", week)
-        user_data = pickle.load(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'))
-        tweet_data = pickle.load(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'))
-        tids = list(tweet_data)
-
-        # build user vectors
-        user_vectors = {user: [tid for tid in tids if tid in retweets] for user, retweets in user_data}
-
-        # save results to pickle
-        vector_folder = os.path.join('DataSet', 'vectors')
-        vector_filename = 'user-vectors-for-week-' + str(week)
-        write_json(user_vectors, vector_folder, vector_filename)
+    run_process_pool(vector_worker, range(1, count + 1))
     print('User vectors complete')
+
+
+def vector_worker(week):
+    # load data from pickles
+    print("Building user vectors for week", week)
+    user_data = pickle.load(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'))
+    tweet_data = pickle.load(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'))
+    tids = list(tweet_data)
+
+    # build user vectors
+    user_vectors = {user: [(1 if tid in retweets else 0) for tid in tids] for user, retweets in user_data}
+
+    # save results to pickle
+    vector_folder = os.path.join('DataSet', 'vectors')
+    vector_filename = 'user-vectors-for-week-' + str(week)
+    write_pickle(user_vectors, vector_folder, vector_filename)
 
 def write_pickle(data, folder_path, base_filename):
     os.makedirs(folder_path, exist_ok=True)
@@ -127,6 +129,12 @@ class NpEncoder(json.JSONEncoder):
             return list(obj)
         else:
             return super(NpEncoder, self).default(obj)
+
+
+def run_process_pool(worker_func, args):
+    pool = multiprocessing.Pool(abs(multiprocessing.cpu_count() - 2) or 1)
+    pool.map(worker_func, args)
+    pool.join()
 
 
 if __name__ == '__main__':

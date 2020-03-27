@@ -60,6 +60,7 @@ def extract_user_and_retweet_data(count):
             for i in week_data[week_data['screen_name_from'] == user].index:
                 tid = week_data['retweet_tid'][i]
                 user_data[user].add(tid)
+                tids.add(tid)
             # filter out users with only 1 retweet
             if len(user_data[user]) == 1:
                 del user_data[user]
@@ -78,6 +79,24 @@ def extract_user_and_retweet_data(count):
         week = week + 1
     print('Extraction complete')
 
+
+def build_user_vectors(count):
+    print("Building user retweet vectors by week...")
+    for week in range(1, count + 1):
+        # load data from pickles
+        print("Building user vectors for week", week)
+        user_data = pickle.load(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'))
+        tweet_data = pickle.load(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'))
+        tids = list(tweet_data)
+
+        # build user vectors
+        user_vectors = {user: [tid for tid in tids if tid in retweets] for user, retweets in user_data}
+
+        # save results to pickle
+        vector_folder = os.path.join('DataSet', 'vectors')
+        vector_filename = 'user-vectors-for-week-' + str(week)
+        write_json(user_vectors, vector_folder, vector_filename)
+    print('User vectors complete')
 
 def write_pickle(data, folder_path, base_filename):
     os.makedirs(folder_path, exist_ok=True)

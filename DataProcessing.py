@@ -90,9 +90,10 @@ def build_user_vectors(count):
 
 def vector_worker(week):
     # load data from pickles
-    print("Building user vectors for week", week)
-    user_data = pickle.load(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'))
-    tweet_data = pickle.load(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'))
+    with open(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'), 'rb') as file:
+        user_data = pickle.load(file)
+    with open(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'), 'rb') as file:
+        tweet_data = pickle.load(file)
     tids = list(tweet_data)
 
     # build user vectors

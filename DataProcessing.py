@@ -33,15 +33,15 @@ def read_data():
 
 def split_weeks(df):
     print('Splitting the data by week and storing in pickle files...')
-    count = 1
+    count = 0
     from_date = df['dates'].min()
     while from_date <= df['dates'].max():
         to_date = from_date + datetime.timedelta(days=7)
         between_two_dates = (df['dates'] >= from_date) & (df['dates'] < to_date)
         filtered_data = df.loc[between_two_dates]
         if not filtered_data.empty:
-            csv_writer(filtered_data, count)
             count = count + 1
+            csv_writer(filtered_data, count)
         from_date = to_date
     print('Split complete, number of weeks:', count)
     return count
@@ -100,14 +100,14 @@ def vector_worker(week):
     tid_bit_vectors = {tid: 1 for tid in tids}
     i = 1
     for tid in tid_bit_vectors.keys():
-        tid_bit_vectors[tid] = tid_bit_vectors[tid] << i
+        tid_bit_vectors[tid] <<= i
         i += 1
 
     # build user vectors (the vectors are bit vectors to save space)
     user_vectors = {user: 1 for user in user_data.keys()}
     for user, retweets in user_data.items():
         for tid in retweets:
-            user_vectors[user] |=  tid_bit_vectors[tid]
+            user_vectors[user] |= tid_bit_vectors[tid]
 
     # save results to pickle
     vector_folder = os.path.join('DataSet', 'vectors')

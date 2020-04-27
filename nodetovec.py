@@ -6,13 +6,13 @@ import pandas as pd
 from node2vec import Node2Vec
 
 
-def node_2_vec(graph):
-    node2vec = Node2Vec(graph, dimensions=64, walk_length=30, num_walks=200, workers=1)
-    model = node2vec.fit(window=10, min_count=2)
+def node_2_vec(graph, index):
+    node2vec = Node2Vec(graph, dimensions=64, walk_length=30, num_walks=200, workers=4)
+    model = node2vec.fit(window=20, min_count=2)
     print(model)
-    for node in model:
-        if len(node) > 3:
-            print(node)
+    filename = os.path.join('DataSet', 'node', 'emb-from-week-' + str(index) + '.emb')
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    model.wv.save_word2vec_format(filename)
 
 
 def construct_graph(data):
@@ -24,7 +24,7 @@ def construct_graph(data):
         nodes.append(key1)
         for key2, value2 in data.items():
             if key1 != key2 and key2 not in seen:
-                if len(value1 & value2) >= 2:
+                if len(value1 & value2) >= 3:
                     pair = (key1, key2)
                     edges.append(pair)
         seen.add(key1)
@@ -42,8 +42,9 @@ def main():
         data = pd.read_pickle(os.path.join('DataSet', 'users', 'data-from-week-' + str(index) + '.pkl'))
         print("Done Reading...")
         graph = construct_graph(data)
-        print("made graph...")
-        node_2_vec(graph)
+        print("Done constructing graph...")
+        node_2_vec(graph, index)
+        print("Done with node2vec")
 
 
 if __name__ == '__main__':

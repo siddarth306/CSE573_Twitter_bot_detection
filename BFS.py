@@ -24,12 +24,12 @@ class Graph:
         self.graph[u].append(v)
 
     # Function to print a BFS of graph
-    def BFS(self, s):
+    def BFS(self, s, nodes_visited, data):
         #nodes visited
-        nodes_visited=[]
-
+        #nodes_visited=[]
+        members = []
         # Mark all the vertices as not visited
-        visited = [False] * (len(self.graph))
+        #visited = [False] * (len(self.graph))
 
         # Create a queue for BFS
         queue = []
@@ -37,26 +37,27 @@ class Graph:
         # Mark the source node as
         # visited and enqueue it
         queue.append(s)
-        visited[s] = True
+        #visited[s] = True
 
+        nodes_visited.add(s)
         while queue:
 
             # Dequeue a vertex from
             # queue and print it
             s = queue.pop(0)
             # print(s, end=" ")
-            nodes_visited.append(s)
+            members.append(s)
 
             # Get all adjacent vertices of the
             # dequeued vertex s. If a adjacent
             # has not been visited, then mark it
             # visited and enqueue it
             for i in self.graph[s]:
-                if visited[i] == False:
+                if i not in nodes_visited and data[s][i] >= 0.98:
                     queue.append(i)
-                    visited[i] = True
+                    nodes_visited.add(i)
 
-        return nodes_visited
+        return members
 # # Driver code
 #
 # # Create a graph given in

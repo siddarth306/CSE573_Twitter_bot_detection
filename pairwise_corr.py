@@ -1,4 +1,3 @@
-import K_means as km
 import pandas as pd
 import pickle
 
@@ -17,7 +16,5 @@ def compute_coor(data):
     coor_matrix = df.corr(method='pearson')
     coor_matrix[coor_matrix < .90] = 0 #filter
     return coor_matrix
-
-
 
 

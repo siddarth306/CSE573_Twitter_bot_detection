@@ -1,8 +1,10 @@
 import csv
 import os
 import os.path
-from pairwise_corr import read_nmf_data
+from pairwise_corr import read_nmf_data, compute_coor_for_cluster
 from sklearn.cluster import KMeans
+import pandas as pd
+
 
 # sample_filename = "/home/smollfish/Desktop/CSE573_Twitter_bot_detection/DataSet_filtered/nmf/nmf-for-week-1.pkl"
 
@@ -10,6 +12,7 @@ from sklearn.cluster import KMeans
 # Runs K means and finds the the optimal k using elbow method
 # ref: https://blog.cambridgespark.com/how-to-determine-the-optimal-number-of-clusters-for-k-means-clustering-14f27070048f
 def find_optimal_k(data):
+    # import matplotlib.pyplot as plt
     Sum_of_squared_distances = []
     K = range(1, 30)
     for k in K:
@@ -17,42 +20,39 @@ def find_optimal_k(data):
         km = km.fit(data)
         Sum_of_squared_distances.append(km.inertia_)
 
-    # Graph figure
+    # # Graph figure
     # plt.plot(K, Sum_of_squared_distances, 'bx-')
     # plt.xlabel('k')
     # plt.ylabel('Sum_of_squared_distances')
     # plt.title('Elbow Method For Optimal k')
     # plt.show()
 
-    #find elbow
+    # find elbow
     from kneed import KneeLocator
     kn = KneeLocator(K, Sum_of_squared_distances, curve='convex', direction='decreasing')
     print(kn.knee)
     return kn
 
-#i.e. input should look like
-#   clusters_of_username = [["user1","user2"],["user9"]]
-#   returns bots_in_cluster = [{"user1"},{}]
-def find_bots(clusters_of_username):
-    # read botnames.csv
-    with open('DataSet/botnames.csv') as csvfile:
-        readCSV = csv.reader(csvfile, delimiter=',')
-        botnames = []
-        for row in readCSV:
-            botnames.append(row[1])
-    del botnames[0]  # remove first row, this was the title of the csv column
 
-    # compare clusters to bot list: for each cluster, what is the ratio of bots to other users
+def find_bots(clusters_of_username, users):
+    #   :param      - clusters_of_username = [["user1","user2"],["user9"]]
+    #   :returns    - bots_in_cluster = [{"user1"},{}]
+
+    # # read botnames.csv
+    botnames = pd.read_csv("/home/smollfish/Desktop/CSE573_Twitter_bot_detection/DataSet/botnames.csv")
+    week_bots = set(botnames["BotName"].tolist()).intersection(set(users))
+
+    # compare clusters to bot list: for each cluster
     set_b = set(botnames)
     bots_in_cluster = []
     for i in range(len(clusters_of_username)):
         set_a = set(clusters_of_username[i])
-        bots = set_a.intersection(set_b)
+        bots = set_a.intersection(week_bots)
         bots_in_cluster.append(bots)
 
     return bots_in_cluster
 
-# will organize code better, and rename this function later
+
 def run_kmeans(filepath):
     print("Reading...", filepath)
     users, values = read_nmf_data(filepath)
@@ -63,27 +63,57 @@ def run_kmeans(filepath):
     kmeans = KMeans(n_clusters=n_cluster, random_state=0).fit(values)
 
     # find the users in each cluster + count the data points in each cluster
+    clusters_of_users_idx = [[] for k in range(n_cluster)]
     clusters_of_users = [[] for k in range(n_cluster)]
     clusters_of_values = [[] for k in range(n_cluster)]  # NMF data corresponding to clusters_of_users
     for i in range(len(kmeans.labels_)):
-        clusters_of_users[kmeans.labels_[i]].append(users[i])
+        clusters_of_users_idx[kmeans.labels_[i]].append(i)
+        clusters_of_users[kmeans.labels_[i]].append((users[i]))
         clusters_of_values[kmeans.labels_[i]].append(values[i])
-
     print("Number of users in each cluster k={:}:".format(n_cluster),
           [len(clusters_of_users[k]) for k in range(n_cluster)])
 
     # find bots in each cluster
-    bots_in_cluster = find_bots(clusters_of_users)
-    print("Number of bots in each cluster k={:}:".format(n_cluster),
+    bots_in_cluster = find_bots(clusters_of_users, users)
+    print("Number of Russian bots in each cluster k={:}:".format(n_cluster),
+          [len(bots_in_cluster[k]) for k in range(n_cluster)])
+
+    # compute pairwise correlation of clusters
+    avg_corr_of_clusters = []
+    for cluster in clusters_of_values:
+        avg_corr = compute_coor_for_cluster(cluster)
+        avg_corr_of_clusters.append(avg_corr)
+    [(print("Average Correlation of Cluster {:} : {:}".format(k, round(avg_corr_of_clusters[k], 2)))) for k in
+     range(n_cluster)]
+
+    # delete clusters where average correlation < .995
+    for ix in range(len(avg_corr_of_clusters)):
+        if (avg_corr_of_clusters[ix] < 0.995):
+            clusters_of_users[ix] = []
+            clusters_of_values[ix] = []
+
+    # find bots in each cluster after removing low correlation clusters
+    bots_in_cluster = find_bots(clusters_of_users, users)
+    print("Number of Russian bots in each cluster after removing low correlation clusters\n",
           [len(bots_in_cluster[k]) for k in range(n_cluster)])
 
     # calculate precision of each cluster
-    precision_of_clusters = []
-    [precision_of_clusters.append(len(bots_in_cluster[k]) / len(clusters_of_users[k])) for k in range(n_cluster)]
-    average_precision = sum(precision_of_clusters) / len(precision_of_clusters)
-    print("Average Precision:", average_precision, "\n")
+    # # precision 1: russian bots in each cluster/ total users in cluster
+    # precision_of_clusters = []
+    # [precision_of_clusters.append(len(bots_in_cluster[k]) / len(clusters_of_users[k])) for k in range(n_cluster)]
+    # average_precision = sum(precision_of_clusters) / len(precision_of_clusters)
+    # print("Average Precision:", average_precision)
 
-    return clusters_of_values, optimal_k
+    # precision 2: all detected russian bots/total russian bots in this week
+    botnames = pd.read_csv("/home/smollfish/Desktop/CSE573_Twitter_bot_detection/DataSet/botnames.csv")
+    week_bots = set(botnames["BotName"].tolist()).intersection(set(users))
+    calculated_bots = 0
+    for cluster in bots_in_cluster:
+        calculated_bots = calculated_bots + len(cluster)
+
+    print("Total Russian bots detected: {:}, Total Russian bots in the week: {:}".format(calculated_bots,len(week_bots)) )
+    print("Average Precision: ", calculated_bots/len(week_bots))
+    print()
 
 
 def main():

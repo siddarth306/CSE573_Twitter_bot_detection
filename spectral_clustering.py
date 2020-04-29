@@ -2,7 +2,7 @@ import os
 from Find_optK_for_SC import eigenDecomposition
 from sklearn.cluster import SpectralClustering
 from K_means import find_bots
-from pairwise_corr import read_nmf_data, compute_coor, compute_coor_for_cluster
+from pairwise_corr import read_nmf_data, compute_coor_for_specClust, compute_coor_for_cluster
 import pandas as pd
 
 
@@ -20,10 +20,10 @@ import pandas as pd
 def sc(filepath):
     print("Reading...", filepath)
     users, values = read_nmf_data(filepath)
-    coor_matrix = compute_coor(values)
+    coor_matrix = compute_coor_for_specClust(values)
 
     # find best k
-    nb_clusters, eigenvalues, eigenvectors = eigenDecomposition(coor_matrix.to_numpy())
+    nb_clusters, eigenvalues, eigenvectors = eigenDecomposition(coor_matrix.values)
     n_cluster = min(nb_clusters)
 
     #cluster
@@ -54,7 +54,7 @@ def sc(filepath):
 
     # delete clusters where average correlation < .995
     for ix in range(len(avg_corr_of_clusters)):
-        if (avg_corr_of_clusters[ix] < 0.995):
+        if (avg_corr_of_clusters[ix] < 0.90):
             clusters_of_users[ix] = []
             clusters_of_values[ix] = []
 
@@ -93,7 +93,7 @@ def main():
     basepath = "/home/smollfish/Desktop/CSE573_Twitter_bot_detection/"
     print('Reading data from nmf folder...')
     number_of_files = len(os.listdir(basepath + 'DataSet_filtered/nmf'))
-    for index in range(4, number_of_files + 1):
+    for index in range(2, number_of_files + 1):
         filepath = os.path.join(basepath, 'DataSet_filtered', 'nmf', 'nmf-for-week-' + str(index) + '.pkl')
         sc(filepath)
 

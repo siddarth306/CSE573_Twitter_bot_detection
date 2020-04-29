@@ -12,12 +12,15 @@ def read_nmf_data(filename):
     #    values.append(dict[key])
     return list(data_dict.keys()), list(data_dict.values())
 
-
 def compute_coor(data):
     df = pd.DataFrame(data).transpose()
     coor_matrix = df.corr(method='pearson')
-    #coor_matrix[coor_matrix < .90] = 0  # filter
-    #coor_matrix[coor_matrix < .90] = 0 #filter
+    return coor_matrix
+
+def compute_coor_for_specClust(data):
+    df = pd.DataFrame(data).transpose()
+    coor_matrix = df.corr(method='pearson')
+    coor_matrix[coor_matrix < .90] = 0  # filter
     return coor_matrix
 
 

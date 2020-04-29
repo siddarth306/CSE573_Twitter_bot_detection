@@ -3,20 +3,21 @@ import pickle
 
 
 def read_nmf_data(filename):
-    dict = pickle.load(open(filename, 'rb'))
+    data_dict = pickle.load(open(filename, 'rb'))
     # convert dict to array
-    users = []
-    values = []
-    for key in dict:
-        users.append(key)
-        values.append(dict[key])
-    return users, values
+    #users = []
+    #values = []
+    #for key in dict:
+    #    users.append(key)
+    #    values.append(dict[key])
+    return list(data_dict.keys()), list(data_dict.values())
 
 
 def compute_coor(data):
     df = pd.DataFrame(data).transpose()
     coor_matrix = df.corr(method='pearson')
-    coor_matrix[coor_matrix < .90] = 0  # filter
+    #coor_matrix[coor_matrix < .90] = 0  # filter
+    #coor_matrix[coor_matrix < .90] = 0 #filter
     return coor_matrix
 
 

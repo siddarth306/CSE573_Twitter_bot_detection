@@ -6,17 +6,18 @@ import multiprocessing
 
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 
 def main():
     df = read_data()
-    count = split_weeks(df)
-    extract_user_and_retweet_data(count)
-    build_user_vectors(count)
+    count = split_weeks(df, 7)
+    extract_user_and_retweet_data(count, 7)
+    build_user_vectors(count, 7)
 
 
-def csv_writer(filtered_data, count):
-    filename = os.path.join('DataSet', 'weeks', 'data-from-week-' + str(count) + '.pkl')
+def csv_writer(filtered_data, count, timeperiod):
+    filename = os.path.join('DataSet_{}_day'.format(timeperiod), 'weeks', 'data-from-week-' + str(count) + '.pkl')
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     filtered_data.to_pickle(filename)
 
@@ -30,32 +31,65 @@ def read_data():
                     columns=['tid', 'retweet_tid', 'screen_name_from', 'screen_name_to', 'postedtime', 'dates', 'time'])
     return df
 
+def get_user_and_retweet_threshold(dataframe, botnames_set):
+    users = set(dataframe["screen_name_from"].tolist())
+    week_botnames = botnames_set.intersection(users)
+    
+    bot_tweets = dataframe[dataframe["screen_name_from"].isin(week_botnames)]
+    bots_tweet_count = defaultdict(int)
+    for idx,row in bot_tweets.iterrows():
+        bots_tweet_count[row["screen_name_from"]] += 1
+    
+    
+    if len(bot_tweets) == 0:
+        return 1,1
 
-def split_weeks(df):
+    bots_tweet_count_list = [*bots_tweet_count.values()]
+    bots_tweet_count_list.sort()
+    #print(bots_tweet_count_list)
+    bot_tweets_group = bot_tweets.groupby("retweet_tid")
+    bot_retweet_size = bot_tweets.groupby("retweet_tid").size()
+    bot_retweet_size_list = bot_retweet_size.tolist()
+    bot_retweet_size_list.sort()
+    bot_retweet_quartile = bot_retweet_size_list[len(bot_retweet_size_list)//3]
+    return max(1, bot_retweet_quartile)
+    
+def split_weeks(df, timeperiod):
     print('Splitting the data by week and storing in pickle files...')
     count = 0
     from_date = df['dates'].min()
+    
+    botnames = pd.read_csv("botnames.csv")
+    botnames_set = set(botnames["BotName"].tolist())
     while from_date <= df['dates'].max():
-        to_date = from_date + datetime.timedelta(days=7)
+        to_date = from_date + datetime.timedelta(days=timeperiod)
         between_two_dates = (df['dates'] >= from_date) & (df['dates'] < to_date)
         filtered_data = df.loc[between_two_dates]
-        if not filtered_data.empty:
+        
+        retweet_threshold = get_user_and_retweet_threshold(filtered_data, botnames_set)
+        #print(count, user_threshold, retweet_threshold)
+        #Filter for removing single occurence retweets
+        grouped_filtered_data = filtered_data.groupby("retweet_tid")
+        filtered_rtids = [tid for tid, val in grouped_filtered_data if len(val) > 5]
+        new_filtered_data = filtered_data[filtered_data.retweet_tid.isin(filtered_rtids)]
+
+        if not new_filtered_data.empty:
             count = count + 1
-            csv_writer(filtered_data, count)
+            csv_writer(new_filtered_data, count, timeperiod)
         from_date = to_date
     print('Split complete, number of weeks:', count)
     return count
 
 
-def extract_user_and_retweet_data(count):
+def extract_user_and_retweet_data(count, timeperiod):
     print('Extracting users and retweet data by week...')
-    run_process_pool(extraction_worker, range(1, count + 1))
+    run_process_pool(extraction_worker, [(i, timeperiod) for i in range(1, count + 1)])
     print('Extraction complete')
 
 
-def extraction_worker(week):
+def extraction_worker(week, timeperiod):
     # load data from pickle
-    week_data = pd.read_pickle(os.path.join('DataSet', 'weeks', 'data-from-week-' + str(week) + '.pkl'))
+    week_data = pd.read_pickle(os.path.join('DataSet_{}_day'.format(timeperiod), 'weeks', 'data-from-week-' + str(week) + '.pkl'))
 
     # extract users and retweets
     tids = set()
@@ -67,32 +101,32 @@ def extraction_worker(week):
             user_data[user].add(tid)
             tids.add(tid)
         # filter out users with only 1 retweet
-        if len(user_data[user]) == 1:
+        if len(user_data[user]) <= 4:
             del user_data[user]
 
     print("Number of users in week " + str(week) + ": " + str(len(user_data)))
     print("Number of tweets in week " + str(week) + ": " + str(len(tids)))
 
     # save result to pickle
-    data_folder = os.path.join('DataSet', 'users')
-    tweets_folder = os.path.join('DataSet', 'tweets')
+    data_folder = os.path.join('DataSet_{}_day'.format(timeperiod), 'users')
+    tweets_folder = os.path.join('DataSet_{}_day'.format(timeperiod), 'tweets')
     users_filename = 'data-from-week-' + str(week)
     tweets_filename = 'tweets-from-week-' + str(week)
     write_pickle(user_data, data_folder, users_filename)
     write_pickle(tids, tweets_folder, tweets_filename)
 
 
-def build_user_vectors(count):
+def build_user_vectors(count,timeperiod):
     print("Building user retweet vectors by week...")
-    run_process_pool(vector_worker, range(1, count + 1))
+    run_process_pool(vector_worker, [(i, timeperiod) for i in range(1, count + 1)])
     print('User vectors complete')
 
 
-def vector_worker(week):
+def vector_worker(week, timeperiod):
     # load data from pickles
-    with open(os.path.join('DataSet', 'users', 'data-from-week-' + str(week) + '.pkl'), 'rb') as file:
+    with open(os.path.join('DataSet_{}_day'.format(timeperiod), 'users', 'data-from-week-' + str(week) + '.pkl'), 'rb') as file:
         user_data = pickle.load(file)
-    with open(os.path.join('DataSet', 'tweets', 'tweets-from-week-' + str(week) + '.pkl'), 'rb') as file:
+    with open(os.path.join('DataSet_{}_day'.format(timeperiod), 'tweets', 'tweets-from-week-' + str(week) + '.pkl'), 'rb') as file:
         tweet_data = pickle.load(file)
     tids = list(tweet_data)
 
@@ -110,7 +144,7 @@ def vector_worker(week):
             user_vectors[user] |= tid_bit_vectors[tid]
 
     # save results to pickle
-    vector_folder = os.path.join('DataSet', 'vectors')
+    vector_folder = os.path.join('DataSet_{}_day'.format(timeperiod), 'vectors')
     vector_filename = 'user-vectors-for-week-' + str(week)
     write_pickle(user_vectors, vector_folder, vector_filename)
     print("Completed vectors for week", week)
@@ -146,7 +180,7 @@ class NpEncoder(json.JSONEncoder):
 
 def run_process_pool(worker_func, args):
     pool = multiprocessing.Pool(abs(multiprocessing.cpu_count() - 2) or 1)
-    pool.map(worker_func, args)
+    pool.starmap(worker_func, args)
     pool.close()
     pool.join()
 

@@ -24,7 +24,7 @@ class Graph:
         self.graph[u].append(v)
 
     # Function to print a BFS of graph
-    def BFS(self, s, nodes_visited, data):
+    def BFS(self, s, nodes_visited):
         #nodes visited
         #nodes_visited=[]
         members = []
@@ -53,7 +53,7 @@ class Graph:
             # has not been visited, then mark it
             # visited and enqueue it
             for i in self.graph[s]:
-                if i not in nodes_visited and data[s][i] >= 0.98:
+                if i not in nodes_visited:
                     queue.append(i)
                     nodes_visited.add(i)
 

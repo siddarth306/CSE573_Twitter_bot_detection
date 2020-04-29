@@ -64,7 +64,7 @@ def calc_clusters(week):
         global_visited = set()
         for node in nodes:
             if node not in global_visited:
-                nodes_visited = g.BFS(node, global_visited, data)
+                nodes_visited = g.BFS(node, global_visited)
         
                 clusters.append(nodes_visited)
                 print(nodes_visited)

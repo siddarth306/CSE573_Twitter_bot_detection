@@ -67,7 +67,7 @@ def calc_clusters(week):
                 nodes_visited = g.BFS(node, global_visited)
         
                 clusters.append(nodes_visited)
-                print(nodes_visited)
+                #print(nodes_visited)
                 global_visited.update(nodes_visited) # remove nodes visited graph
         
             #nodes = nodes-set(nodes_visited)
@@ -76,8 +76,18 @@ def calc_clusters(week):
             #root = list(nodes)[0] #get first item
         
         named_clusters = []
-        for cluster in clusters:
+        for cl_idx, cluster in enumerate(clusters):
+            #if len(cluster) >= 4:
             named_single_cluster = []
+
+            #average_cluster_correlation = 0
+            #count = 0
+            #for m_idx, member in enumerate(cluster[:-1]):
+            #    for v in cluster[m_idx+1:]:
+            #        average_cluster_correlation += data[member][v]
+            #        count += 1
+            #average_cluster_correlation = average_cluster_correlation / count
+            #print(" Avg pairwise correlation of week {}, cluster {} is {}".format(week,cl_idx, average_cluster_correlation))
             for member in cluster:
                 named_single_cluster.append(users[member])
             named_clusters.append(named_single_cluster)
@@ -85,11 +95,16 @@ def calc_clusters(week):
         botnames = pd.read_csv("botnames.csv")
         week_bots = set(botnames["BotName"].tolist()).intersection(set(users))
         calculated_bots = set()
+        cluster_precision_total = 0
         for idx, cluster in enumerate(named_clusters): 
             cluster_set = set(cluster) 
-            cluster_bots = cluster_set.intersection(week_bots) 
-            calculated_bots.update(cluster_bots) 
-
+            cluster_bots = cluster_set.intersection(week_bots)
+            calculated_bots.update(cluster_bots)
+            average_bots += len(cluster_bots) / len(cluster_set)
+            #if len(cluster_bots)> 0:
+            #    print(cluster, cluster_bots)
+            cluster_precision_total += len(cluster_bots) / len(cluster_set)
+        print("Week {} Bot Precision: {}, Cluster Precision: {}".format(week, len(calculated_bots)/len(week_bots), cluster_precision_total / len(named_clusters)))
         with open("DataSet/new_approach/new_approach-for-week-{}.pkl".format(week), "wb") as cluster_f:
             pickle.dump((named_clusters,calculated_bots, len(calculated_bots)/len(week_bots)), cluster_f)
         print("Done for week {}".format(week))
@@ -98,9 +113,9 @@ def calc_clusters(week):
 
 def main():
     number_of_files = len(os.listdir('DataSet/nmf'))
-    pool = multiprocessing.Pool(processes=20)
+    pool = multiprocessing.Pool(processes=5)
     #results = [pool.apply_async(calc_node2vec, args=(week,)) for week in range(1,number_of_files+1)]
-    results = [pool.apply_async(calc_clusters, args=(week,)) for week in range(6, 12)]
+    results = [pool.apply_async(calc_clusters, args=(week,)) for week in range(1, 12)]
     for p in results:
         p.get()
     pool.close()

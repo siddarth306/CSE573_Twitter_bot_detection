@@ -5,10 +5,6 @@ from pairwise_corr import read_nmf_data, compute_coor_for_cluster
 from sklearn.cluster import KMeans
 import pandas as pd
 
-
-# sample_filename = "/home/smollfish/Desktop/CSE573_Twitter_bot_detection/DataSet_filtered/nmf/nmf-for-week-1.pkl"
-
-
 # Runs K means and finds the the optimal k using elbow method
 # ref: https://blog.cambridgespark.com/how-to-determine-the-optimal-number-of-clusters-for-k-means-clustering-14f27070048f
 def find_optimal_k(data):
@@ -53,21 +49,22 @@ def find_bots(clusters_of_username, users):
     return bots_in_cluster
 
 
-def run_kmeans(filepath):
+def run_kmeans(filepath, ith):
     print("Reading...", filepath)
     users, values = read_nmf_data(filepath)
-    optimal_k = find_optimal_k(values)
+
+    # optimal_k = find_optimal_k(values)
+    # n_cluster = optimal_k.elbow
+    optimal_k = best_k_precomputed[ith]
 
     # cluster data
-    n_cluster = optimal_k.elbow
+    n_cluster = optimal_k
     kmeans = KMeans(n_clusters=n_cluster, random_state=0).fit(values)
 
     # find the users in each cluster + count the data points in each cluster
-    clusters_of_users_idx = [[] for k in range(n_cluster)]
     clusters_of_users = [[] for k in range(n_cluster)]
     clusters_of_values = [[] for k in range(n_cluster)]  # NMF data corresponding to clusters_of_users
     for i in range(len(kmeans.labels_)):
-        clusters_of_users_idx[kmeans.labels_[i]].append(i)
         clusters_of_users[kmeans.labels_[i]].append((users[i]))
         clusters_of_values[kmeans.labels_[i]].append(values[i])
     print("Number of users in each cluster k={:}:".format(n_cluster),
@@ -88,7 +85,7 @@ def run_kmeans(filepath):
 
     # delete clusters where average correlation < .995
     for ix in range(len(avg_corr_of_clusters)):
-        if (avg_corr_of_clusters[ix] < 0.995):
+        if (avg_corr_of_clusters[ix] < 0.90):
             clusters_of_users[ix] = []
             clusters_of_values[ix] = []
 
@@ -98,11 +95,17 @@ def run_kmeans(filepath):
           [len(bots_in_cluster[k]) for k in range(n_cluster)])
 
     # calculate precision of each cluster
-    # # precision 1: russian bots in each cluster/ total users in cluster
-    # precision_of_clusters = []
-    # [precision_of_clusters.append(len(bots_in_cluster[k]) / len(clusters_of_users[k])) for k in range(n_cluster)]
-    # average_precision = sum(precision_of_clusters) / len(precision_of_clusters)
-    # print("Average Precision:", average_precision)
+    # precision 1: russian bots in each cluster/ total users in cluster
+    precision_of_clusters = []
+    for k in range(n_cluster):
+        if len(clusters_of_users[k]) != 0:
+            precision_of_clusters.append(len(bots_in_cluster[k]) / len(clusters_of_users[k]))
+    if (len(precision_of_clusters) != 0):
+        average_precision = sum(precision_of_clusters) / len(precision_of_clusters)
+    else:
+        average_precision = 0
+
+    print("Average Cluster Precision:", average_precision)
 
     # precision 2: all detected russian bots/total russian bots in this week
     botnames = pd.read_csv("/home/smollfish/Desktop/CSE573_Twitter_bot_detection/DataSet/botnames.csv")
@@ -111,18 +114,23 @@ def run_kmeans(filepath):
     for cluster in bots_in_cluster:
         calculated_bots = calculated_bots + len(cluster)
 
-    print("Total Russian bots detected: {:}, Total Russian bots in the week: {:}".format(calculated_bots,len(week_bots)) )
-    print("Average Precision: ", calculated_bots/len(week_bots))
+    print(
+        "Total Russian bots detected: {:}, Total Russian bots in the week: {:}".format(calculated_bots, len(week_bots)))
+    print("Average Accuracy: ", calculated_bots / len(week_bots))
     print()
 
+
+best_k_precomputed = [9, 3, 4, 4, 6, 4, 4, 6, 4, 4, 5, 4, 2, 4, 5, 5, 8, 3, 6, 4, 7, 6, 7, 6, 5, 4, 3, 5, 3, 6, 3, 3, 5,
+                      4, 3, 4]
 
 def main():
     basepath = "/home/smollfish/Desktop/CSE573_Twitter_bot_detection/"
     print('Reading data from nmf folder...')
     number_of_files = len(os.listdir(basepath + 'DataSet_filtered/nmf'))
-    for index in range(1, number_of_files + 1):
+    for index in range(15
+            , number_of_files + 1):
         filepath = os.path.join(basepath, 'DataSet_filtered', 'nmf', 'nmf-for-week-' + str(index) + '.pkl')
-        run_kmeans(filepath)
+        run_kmeans(filepath, index - 1)
 
 
 if __name__ == '__main__':
